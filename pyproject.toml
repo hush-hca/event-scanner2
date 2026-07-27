@@ -4,6 +4,9 @@ version = "0.1.0"
 requires-python = ">=3.12"
 dependencies = ["fastapi>=0.140", "uvicorn[standard]>=0.51", "httpx>=0.28", "feedparser>=6.0"]
 
+[project.scripts]
+app = "event_scanner.main:app"
+
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]
