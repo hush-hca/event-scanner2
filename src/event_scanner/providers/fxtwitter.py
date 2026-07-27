@@ -17,3 +17,10 @@ class FxTwitterClient:
             r=await c.get(f'{self.base_url}/status/{chunks[-1]}'); r.raise_for_status(); data=r.json()
         if data.get('code') != 200 or not data.get('status'): raise FxTwitterError('FxTwitter response failed')
         s=data['status']; return XPost(str(s['id']), s['author']['screen_name'].lower(), s['text'], s['url'], datetime.fromisoformat(s['created_at'].replace('Z','+00:00')))
+    async def list_statuses(self, handle: str) -> list[XPost]:
+        async with httpx.AsyncClient(timeout=10) as c:
+            r=await c.get(f'{self.base_url}/profile/{handle}/statuses', params={'count': 20})
+            if r.status_code == 204: return []
+            r.raise_for_status(); data=r.json()
+        if data.get('code') != 200: raise FxTwitterError('FxTwitter response failed')
+        return [XPost(str(s['id']), s['author']['screen_name'].lower(), s['text'], s['url'], datetime.fromisoformat(s['created_at'].replace('Z','+00:00'))) for s in data.get('results', []) if s.get('type') == 'status']

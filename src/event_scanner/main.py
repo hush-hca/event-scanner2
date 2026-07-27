@@ -36,6 +36,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         try: return await service.ingest(event)
         except ValueError as exc: raise HTTPException(status_code=409, detail=str(exc)) from exc
 
+    @app.post('/v1/x/poll')
+    async def poll_x(token: str):
+        result={'processed': 0, 'duplicates': 0, 'failed': []}
+        for handle in settings.x_watched_handles:
+            try:
+                for post in await fx.list_statuses(handle):
+                    event=RawEvent(title=post.text[:500], body=post.text, source_url=post.url, source_name=f'@{post.handle}', token=token, occurred_at=post.created_at, trusted=True)
+                    try: await service.ingest(event); result['processed'] += 1
+                    except ValueError: result['duplicates'] += 1
+            except FxTwitterError: result['failed'].append(handle)
+        return result
+
     return app
 
 
