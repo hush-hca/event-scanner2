@@ -17,6 +17,13 @@ def test_health_is_ok(tmp_path):
     assert client.get("/health").json() == {"status": "ok"}
 
 
+def test_root_serves_dashboard(tmp_path):
+    client = TestClient(create_app(Settings(db_path=str(tmp_path / "dashboard.db"))))
+    response = client.get("/")
+    assert response.status_code == 200
+    assert "Crypto Event-Driven Scanner" in response.text
+
+
 def test_trusted_hack_with_market_confirmation_is_high():
     result = assess_event(event(), {"ABC": "ABCUSDT"}, MarketSnapshot(price_change_pct=-4, quote_volume=2_000_000), False)
     assert result.level is SignalLevel.HIGH
