@@ -12,7 +12,12 @@ from pydantic import BaseModel
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or Settings()
     app = FastAPI(title="Crypto Event-Driven Scanner", version="0.1.0")
-    service = ScannerService(EventRepository(settings.db_path), TelegramNotifier(settings))
+    try:
+        repository = EventRepository(settings.db_path)
+    except Exception:
+        # Serverless startup must remain available if an ephemeral volume is unavailable.
+        repository = EventRepository(":memory:")
+    service = ScannerService(repository, TelegramNotifier(settings))
     fx = FxTwitterClient(settings.fxtwitter_base_url)
     class XUrlRequest(BaseModel): url: str; token: str
 
