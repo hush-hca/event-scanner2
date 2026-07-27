@@ -29,3 +29,7 @@ docker compose up --build
 ```
 
 X and on-chain vendors differ by credentials and policy, so this MVP receives their normalized authenticated webhook events through `/v1/events`; add gateway authentication before public deployment.
+
+## Vercel
+
+Vercel functions have a read-only deployment filesystem. The app automatically uses `/tmp/event_scanner.db` when `VERCEL=1`, which prevents a function startup crash but is ephemeral per serverless instance. Use a managed persistent database before relying on historical alerts, analytics, or deduplication in production.
