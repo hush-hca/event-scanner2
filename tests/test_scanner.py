@@ -12,13 +12,13 @@ def event(token="ABC"):
     return RawEvent(title="ABC protocol hack confirmed", body="exploit caused losses", source_url="https://x.com/abc/status/1", source_name="ABC", token=token, trusted=True, occurred_at=datetime.now(timezone.utc))
 
 
-def test_health_is_ok(tmp_path):
-    client = TestClient(create_app(Settings(db_path=str(tmp_path / "test.db"))))
+def test_health_is_ok():
+    client = TestClient(create_app(Settings(db_path=":memory:")))
     assert client.get("/health").json() == {"status": "ok"}
 
 
-def test_root_serves_dashboard(tmp_path):
-    client = TestClient(create_app(Settings(db_path=str(tmp_path / "dashboard.db"))))
+def test_root_serves_dashboard():
+    client = TestClient(create_app(Settings(db_path=":memory:")))
     response = client.get("/")
     assert response.status_code == 200
     assert "Crypto Event-Driven Scanner" in response.text
