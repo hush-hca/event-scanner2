@@ -11,6 +11,7 @@ from .repository import EventRepository
 from .service import ScannerService
 from .providers.fxtwitter import FxTwitterClient, FxTwitterError
 from .cat_rank import score_contract
+from .volume_fire import filter_volume_fire
 from pydantic import BaseModel
 
 
@@ -25,6 +26,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     service = ScannerService(repository, TelegramNotifier(settings))
     fx = FxTwitterClient(settings.fxtwitter_base_url)
     cat_cache: list = []
+    volume_fire_cache: list = []
     class XUrlRequest(BaseModel): url: str; token: str
 
     @app.get("/health")
@@ -89,6 +91,25 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         rows=await scan_cat_rank()
         table=''.join(f"<tr><td>{i+1}</td><td>{r.symbol}</td><td>{r.score}</td><td>{r.volume_score}</td><td>{r.accumulation_score}</td><td>{r.support_score}</td><td>{r.breakout_score}</td><td>{', '.join(r.flags) or '-'}</td></tr>" for i,r in enumerate(rows)) or '<tr><td colspan=8>Binance data unavailable.</td></tr>'
         return f"<html><head><meta charset=utf-8><title>Cat Rank</title><style>body{{font:14px system-ui;background:#0b1020;color:#e7eaf0;padding:32px}}table{{width:100%;border-collapse:collapse}}td,th{{padding:12px;border-bottom:1px solid #26314d;text-align:left}}a{{color:#93c5fd}}</style></head><body><a href='/'>Event Scanner</a><h1>Cat Rank</h1><p>Chart, volume, accumulation, and support observation ranking. Not a buy signal.</p><table><tr><th>#</th><th>Symbol</th><th>Rank</th><th>Volume</th><th>Accumulation</th><th>Support</th><th>Breakout</th><th>Risk</th></tr>{table}</table></body></html>"
+
+    async def scan_volume_fire():
+        nonlocal volume_fire_cache
+        if volume_fire_cache: return volume_fire_cache
+        catalog=await service.binance.refresh_catalog(); rows=[]
+        for symbol in list(catalog.values())[:100]:
+            item=filter_volume_fire(symbol,await service.binance.klines(symbol,'4h',20))
+            if item: rows.append(item)
+        volume_fire_cache=sorted(rows,key=lambda r:r.multiple,reverse=True)
+        return volume_fire_cache
+
+    @app.get('/v1/volume-fire')
+    async def volume_fire_api(): return [r.__dict__ for r in await scan_volume_fire()]
+
+    @app.get('/volume-fire', response_class=HTMLResponse, include_in_schema=False)
+    async def volume_fire_page():
+        rows=await scan_volume_fire()
+        table=''.join(f'<tr><td>{r.symbol}</td><td>{r.current_volume:,.0f}</td><td>{r.average_volume:,.0f}</td><td>{r.multiple:.2f}x</td></tr>' for r in rows) or '<tr><td colspan=4>No contracts meet the 2.0x filter.</td></tr>'
+        return f"<html><head><meta charset=utf-8><title>Volume Fire</title><style>body{{font:14px system-ui;background:#0b1020;color:#e7eaf0;padding:32px}}table{{width:100%;border-collapse:collapse}}td,th{{padding:12px;border-bottom:1px solid #26314d;text-align:left}}a{{color:#93c5fd}}</style></head><body><a href='/cat-rank'>Cat Rank</a><h1>Volume Fire</h1><p>Current 4h volume is at least 2.0x the prior 19-candle average. Observation only.</p><table><tr><th>Symbol</th><th>Current 4h</th><th>Prior 19 avg</th><th>Multiple</th></tr>{table}</table></body></html>"
 
     return app
 
