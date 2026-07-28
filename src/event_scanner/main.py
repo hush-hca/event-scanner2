@@ -10,6 +10,7 @@ from .notifier import TelegramNotifier
 from .repository import EventRepository
 from .service import ScannerService
 from .providers.fxtwitter import FxTwitterClient, FxTwitterError
+from .cat_rank import score_contract
 from pydantic import BaseModel
 
 
@@ -23,6 +24,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         repository = EventRepository(":memory:")
     service = ScannerService(repository, TelegramNotifier(settings))
     fx = FxTwitterClient(settings.fxtwitter_base_url)
+    cat_cache: list = []
     class XUrlRequest(BaseModel): url: str; token: str
 
     @app.get("/health")
@@ -67,6 +69,26 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     except ValueError: result['duplicates'] += 1
             except FxTwitterError: result['failed'].append(handle)
         return result
+
+    async def scan_cat_rank():
+        nonlocal cat_cache
+        if cat_cache: return cat_cache
+        catalog=await service.binance.refresh_catalog(); results=[]
+        for symbol in list(catalog.values())[:60]:
+            c4,cd,cw=await service.binance.klines(symbol,'4h'),await service.binance.klines(symbol,'1d'),await service.binance.klines(symbol,'1w')
+            rank=score_contract(symbol,c4,cd,cw)
+            if rank.score: results.append(rank)
+        cat_cache=sorted(results,key=lambda r:r.score,reverse=True)[:20]
+        return cat_cache
+
+    @app.get('/v1/cat-rank')
+    async def cat_rank_api(): return [r.__dict__ for r in await scan_cat_rank()]
+
+    @app.get('/cat-rank', response_class=HTMLResponse, include_in_schema=False)
+    async def cat_rank_page():
+        rows=await scan_cat_rank()
+        table=''.join(f"<tr><td>{i+1}</td><td>{r.symbol}</td><td>{r.score}</td><td>{r.volume_score}</td><td>{r.accumulation_score}</td><td>{r.support_score}</td><td>{r.breakout_score}</td><td>{', '.join(r.flags) or '-'}</td></tr>" for i,r in enumerate(rows)) or '<tr><td colspan=8>Binance data unavailable.</td></tr>'
+        return f"<html><head><meta charset=utf-8><title>Cat Rank</title><style>body{{font:14px system-ui;background:#0b1020;color:#e7eaf0;padding:32px}}table{{width:100%;border-collapse:collapse}}td,th{{padding:12px;border-bottom:1px solid #26314d;text-align:left}}a{{color:#93c5fd}}</style></head><body><a href='/'>Event Scanner</a><h1>Cat Rank</h1><p>Chart, volume, accumulation, and support observation ranking. Not a buy signal.</p><table><tr><th>#</th><th>Symbol</th><th>Rank</th><th>Volume</th><th>Accumulation</th><th>Support</th><th>Breakout</th><th>Risk</th></tr>{table}</table></body></html>"
 
     return app
 
