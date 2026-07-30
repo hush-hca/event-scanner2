@@ -14,3 +14,4 @@ class Settings:
     db_path: str = os.getenv("EVENT_SCANNER_DB_PATH", _default_db_path())
     x_watched_handles: tuple[str, ...] = tuple(x.strip().lower().lstrip("@") for x in os.getenv("X_WATCHED_HANDLES", "").split(",") if x.strip())
     fxtwitter_base_url: str = os.getenv("FXTWITTER_BASE_URL", "https://api.fxtwitter.com/2")
+    rss_feeds: tuple[str, ...] = tuple(url.strip() for url in os.getenv("RSS_FEEDS", "").split(",") if url.strip())

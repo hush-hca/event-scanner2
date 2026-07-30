@@ -6,6 +6,7 @@ from event_scanner.config import Settings
 from event_scanner.domain import MarketSnapshot, RawEvent, SignalLevel
 from event_scanner.main import create_app
 from event_scanner.scoring import assess_event
+from event_scanner.providers.rss import infer_token
 
 
 def event(token="ABC"):
@@ -31,3 +32,8 @@ def test_trusted_hack_with_market_confirmation_is_high():
 
 def test_unmapped_token_is_hold():
     assert assess_event(event("MISSING"), {}, MarketSnapshot(price_change_pct=-4), False).level is SignalLevel.HOLD
+
+
+def test_rss_token_inference_only_accepts_known_binance_asset():
+    assert infer_token("Protocol exploit impacts AAVE holders", {"AAVE": "AAVEUSDT"}) == "AAVE"
+    assert infer_token("Protocol exploit impacts an unknown project", {"AAVE": "AAVEUSDT"}) is None

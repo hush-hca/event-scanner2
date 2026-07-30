@@ -10,7 +10,7 @@ $env:PYTHONPATH='src'
 python -m uvicorn event_scanner.main:app --reload
 ```
 
-`X_WATCHED_HANDLES` is pre-populated with global exchange, stablecoin, infrastructure, DeFi, and security-notice accounts. Treat it as a starting allowlist: remove accounts outside your risk policy before production. A watched account only makes a post eligible as a trusted source; it does not bypass structural-risk, Binance, or on-chain verification.
+`X_WATCHED_HANDLES` is pre-populated with global exchange, stablecoin, infrastructure, DeFi, and security-notice accounts. Treat it as a starting allowlist: remove accounts outside your risk policy before production. A watched account only makes a post eligible as a trusted source; it does not bypass structural-risk, Binance, or on-chain verification. Trigger `POST /v1/rss/poll` to fetch live CoinDesk/Cointelegraph RSS entries (or the comma-separated `RSS_FEEDS` values), map recognized assets to Binance USDT perpetuals, and store assessed structural-risk events.
 
 Open `http://localhost:8000/docs`. Use `POST /v1/events` for X/project/news/on-chain webhook payloads. Set `trusted: true` only after validating the provider; set `onchain_confirmation: true` only from a verified on-chain adapter.
 

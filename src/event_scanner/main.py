@@ -10,6 +10,7 @@ from .notifier import TelegramNotifier
 from .repository import EventRepository
 from .service import ScannerService
 from .providers.fxtwitter import FxTwitterClient, FxTwitterError
+from .providers.rss import RssClient, infer_token
 from .cat_rank import score_contract
 from .volume_fire import filter_volume_fire
 from pydantic import BaseModel
@@ -25,6 +26,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         repository = EventRepository(":memory:")
     service = ScannerService(repository, TelegramNotifier(settings))
     fx = FxTwitterClient(settings.fxtwitter_base_url)
+    rss = RssClient(settings.rss_feeds or None) if settings.rss_feeds else RssClient()
     cat_cache: list = []
     volume_fire_cache: list = []
     class XUrlRequest(BaseModel): url: str; token: str
@@ -70,6 +72,24 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     try: await service.ingest(event); result['processed'] += 1
                     except ValueError: result['duplicates'] += 1
             except FxTwitterError: result['failed'].append(handle)
+        return result
+
+    @app.post('/v1/rss/poll')
+    async def poll_rss():
+        if not service.catalog:
+            service.catalog = await service.binance.refresh_catalog()
+        result = {"processed": 0, "held": 0, "duplicates": 0}
+        for item in await rss.fetch():
+            token = infer_token(f"{item.title} {item.body}", service.catalog)
+            if not token:
+                result["held"] += 1
+                continue
+            event = RawEvent(title=item.title, body=item.body, source_url=item.url, source_name=item.source_name, token=token, occurred_at=item.occurred_at, trusted=True)
+            try:
+                await service.ingest(event)
+                result["processed"] += 1
+            except ValueError:
+                result["duplicates"] += 1
         return result
 
     async def scan_cat_rank():
