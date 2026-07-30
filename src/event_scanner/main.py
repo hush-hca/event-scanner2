@@ -46,12 +46,26 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.get("/", response_class=HTMLResponse, include_in_schema=False)
     @app.get("/dashboard", response_class=HTMLResponse, include_in_schema=False)
-    def dashboard():
+    def dashboard(lang: str = "en"):
+        ko = lang.lower() == "ko"
+        copy = {
+            "title": "크립토 이벤트 기반 트레이딩 스캐너" if ko else "Crypto Event-Driven Scanner",
+            "subtitle": "출처가 연결된 구조적 리스크 이벤트를 실시간 트레이딩 맥락으로 제공합니다." if ko else "Live event-driven trading context from source-linked structural-risk events.",
+            "notice": "투자 조언이나 주문 신호가 아닙니다. 데이터는 30초마다 갱신됩니다." if ko else "Decision support only — not investment advice or an execution signal. Updates every 30 seconds.",
+            "feed": "실시간 이벤트 피드" if ko else "Live event feed",
+            "monitoring": "실시간 소스 모니터링 중" if ko else "Monitoring live sources",
+            "empty": "아직 조건을 충족하는 구조적 리스크 이벤트가 없습니다. 검증되고 지원되는 Binance 무기한 선물 계약에 매핑된 이벤트는 자동으로 표시됩니다." if ko else "No qualifying structural-risk events are available yet. New verified events will appear here automatically when they are detected and mapped to a supported Binance perpetual contract.",
+            "coverage": "소스 범위: 신뢰 뉴스/RSS, 공식 프로젝트 공지, 시장 확증 데이터" if ko else "Source coverage: trusted news/RSS, official project communications, and market confirmation.",
+            "source": "출처" if ko else "Source",
+            "event_time": "이벤트 시각" if ko else "Event time",
+            "evidence": "트레이딩 근거" if ko else "Trading evidence",
+            "detected": "감지 시각" if ko else "Detected",
+        }
         rows = service.repository.recent(50)
         body = "".join(
-            f"<article class='event {escape(row['level'])}'><header><b>{escape(row['level'].upper())}</b><span>{row['score']}/100</span><span>{escape(row['symbol'] or 'UNMAPPED')}</span></header><h3><a href='{escape(row['source_url'])}' target='_blank' rel='noreferrer'>{escape(row['title'])}</a></h3><p><b>Source:</b> {escape(row['source_name'] or 'Unavailable')} · <b>Event time:</b> {escape(row['occurred_at'] or row['detected_at'])}</p><p><b>Trading evidence:</b> {escape(', '.join(row['reasons']))}</p><small>Detected: {escape(row['detected_at'])} UTC</small></article>" for row in rows
-        ) or "<div class='event'><h3>Monitoring live sources</h3><p>No qualifying structural-risk events are available yet. New verified events will appear here automatically when they are detected and mapped to a supported Binance perpetual contract.</p><small>Source coverage: trusted news/RSS, official project communications, and market confirmation.</small></div>"
-        return f"""<!doctype html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>Event Scanner</title><style>body{{margin:0;background:#0b1020;color:#e7eaf0;font:15px system-ui;padding:28px;max-width:1200px}}p,small{{color:#aebbd0}}a{{color:#93c5fd}}.notice{{border-left:3px solid #ffb454;padding:12px;background:#161d31}}.grid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}}.event{{background:#161d31;border:1px solid #26314d;border-radius:10px;padding:16px}}header{{display:flex;gap:12px;align-items:center}}header span{{color:#aebbd0}}.high b{{color:#ff7070}}.medium b{{color:#ffb454}}.hold b{{color:#aebbd0}}h3{{margin:16px 0 8px}}</style></head><body><h1>Crypto Event-Driven Scanner</h1><p>Live event-driven trading context from source-linked structural-risk events.</p><div class='notice'>Decision support only — not investment advice or an execution signal. Updates every 30 seconds.</div><h2>Live event feed</h2><div class='grid'>{body}</div><script>setTimeout(()=>location.reload(),30000)</script></body></html>"""
+            f"<article class='event {escape(row['level'])}'><header><b>{escape(row['level'].upper())}</b><span>{row['score']}/100</span><span>{escape(row['symbol'] or 'UNMAPPED')}</span></header><h3><a href='{escape(row['source_url'])}' target='_blank' rel='noreferrer'>{escape(row['title'])}</a></h3><p><b>{copy['source']}:</b> {escape(row['source_name'] or 'Unavailable')} · <b>{copy['event_time']}:</b> {escape(row['occurred_at'] or row['detected_at'])}</p><p><b>{copy['evidence']}:</b> {escape(', '.join(row['reasons']))}</p><small>{copy['detected']}: {escape(row['detected_at'])} UTC</small></article>" for row in rows
+        ) or f"<div class='event'><h3>{copy['monitoring']}</h3><p>{copy['empty']}</p><small>{copy['coverage']}</small></div>"
+        return f"""<!doctype html><html lang={'ko' if ko else 'en'}><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>{copy['title']}</title><style>body{{margin:0;background:#0b1020;color:#e7eaf0;font:15px system-ui;padding:28px;max-width:1200px}}p,small{{color:#aebbd0}}a{{color:#93c5fd}}.notice{{border-left:3px solid #ffb454;padding:12px;background:#161d31}}.grid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}}.event{{background:#161d31;border:1px solid #26314d;border-radius:10px;padding:16px}}header{{display:flex;gap:12px;align-items:center}}header span{{color:#aebbd0}}.high b{{color:#ff7070}}.medium b{{color:#ffb454}}.hold b{{color:#aebbd0}}h3{{margin:16px 0 8px}}.lang{{float:right}}.lang a{{padding:6px 9px;border:1px solid #26314d;text-decoration:none}}</style></head><body><nav class='lang'><a href='/?lang=en'>EN</a><a href='/?lang=ko'>한국어</a></nav><h1>{copy['title']}</h1><p>{copy['subtitle']}</p><div class='notice'>{copy['notice']}</div><h2>{copy['feed']}</h2><div class='grid'>{body}</div><script>setTimeout(()=>location.reload(),30000)</script></body></html>"""
 
     @app.get("/v1/assessments")
     def assessments(limit: int = 50): return service.repository.recent(min(max(limit, 1), 100))
