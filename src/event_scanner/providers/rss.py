@@ -48,6 +48,4 @@ class RssClient:
 
 def infer_token(text: str, catalog: dict[str, str]) -> str | None:
     words = set(re.findall(r"\b[A-Za-z0-9]{2,12}\b", text.upper()))
-    aliases = {"BITCOIN": "BTC", "ETHEREUM": "ETH", "SOLANA": "SOL", "DOGECOIN": "DOGE", "RIPPLE": "XRP", "AVALANCHE": "AVAX", "CHAINLINK": "LINK", "UNISWAP": "UNI", "AAVE": "AAVE"}
-    words.update(aliases[word] for word in words.intersection(aliases))
     return next((token for token in catalog if token in words), None)

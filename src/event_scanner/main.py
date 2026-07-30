@@ -61,7 +61,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "evidence": "트레이딩 근거" if ko else "Trading evidence",
             "detected": "감지 시각" if ko else "Detected",
         }
-        await poll_rss()
         rows = service.repository.recent(50)
         live_items = []
         if not rows:
@@ -77,9 +76,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 except ValueError:
                     continue
             rows = service.repository.recent(50)
-        snapshots = {row['symbol']: await service.binance.market_snapshot(row['symbol']) for row in rows if row['symbol']}
         body = "".join(
-            f"<article class='event {escape(row['level'])}'><header><b>{escape(row['level'].upper())}</b><span>{row['score']}/100</span><span>{escape(row['symbol'] or 'UNMAPPED')}</span></header><h3><a href='{escape(row['source_url'])}' target='_blank' rel='noreferrer'>{escape(row['title'])}</a></h3><p><b>{copy['source']}:</b> {escape(row['source_name'] or 'Unavailable')} · <b>{copy['event_time']}:</b> {escape(row['occurred_at'] or row['detected_at'])}</p><p><b>{copy['evidence']}:</b> {escape(', '.join(row['reasons']))}</p><p><b>Binance 24h:</b> {(f\"{snapshots[row['symbol']].price_change_pct:+.2f}% · ${snapshots[row['symbol']].quote_volume:,.0f} volume\" if snapshots.get(row['symbol']) else 'Unavailable')}</p><small>{copy['detected']}: {escape(row['detected_at'])} UTC</small></article>" for row in rows
+            f"<article class='event {escape(row['level'])}'><header><b>{escape(row['level'].upper())}</b><span>{row['score']}/100</span><span>{escape(row['symbol'] or 'UNMAPPED')}</span></header><h3><a href='{escape(row['source_url'])}' target='_blank' rel='noreferrer'>{escape(row['title'])}</a></h3><p><b>{copy['source']}:</b> {escape(row['source_name'] or 'Unavailable')} · <b>{copy['event_time']}:</b> {escape(row['occurred_at'] or row['detected_at'])}</p><p><b>{copy['evidence']}:</b> {escape(', '.join(row['reasons']))}</p><small>{copy['detected']}: {escape(row['detected_at'])} UTC</small></article>" for row in rows
         ) or "".join(f"<article class='event'><header><b>LIVE SOURCE</b></header><h3><a href='{escape(item.url)}' target='_blank' rel='noreferrer'>{escape(item.title)}</a></h3><p><b>{copy['source']}:</b> {escape(item.source_name)} · <b>{copy['event_time']}:</b> {escape(item.occurred_at.isoformat())}</p><p>{escape(item.body[:300])}</p></article>" for item in live_items) or f"<div class='event'><h3>{copy['monitoring']}</h3><p>{copy['empty']}</p><small>{copy['coverage']}</small></div>"
         return f"""<!doctype html><html lang={'ko' if ko else 'en'}><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>{copy['title']}</title><style>body{{margin:0;background:#0b1020;color:#e7eaf0;font:15px system-ui;padding:28px;max-width:1200px}}p,small{{color:#aebbd0}}a{{color:#93c5fd}}.notice{{border-left:3px solid #ffb454;padding:12px;background:#161d31}}.grid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}}.event{{background:#161d31;border:1px solid #26314d;border-radius:10px;padding:16px}}header{{display:flex;gap:12px;align-items:center}}header span{{color:#aebbd0}}.high b{{color:#ff7070}}.medium b{{color:#ffb454}}.hold b{{color:#aebbd0}}h3{{margin:16px 0 8px}}.lang{{float:right}}.lang a{{padding:6px 9px;border:1px solid #26314d;text-decoration:none}}</style></head><body><nav class='lang'><a href='/?lang=en'>EN</a><a href='/?lang=ko'>한국어</a></nav><h1>{copy['title']}</h1><p>{copy['subtitle']}</p><div class='notice'>{copy['notice']}</div><h2>{copy['feed']}</h2><div class='grid'>{body}</div><script>setTimeout(()=>location.reload(),30000)</script></body></html>"""
 
@@ -112,7 +110,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             except FxTwitterError: result['failed'].append(handle)
         return result
 
-    @app.get('/v1/rss/poll')
     @app.post('/v1/rss/poll')
     async def poll_rss():
         if not service.catalog:
